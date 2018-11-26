@@ -76,7 +76,7 @@ The above output gives the number of charcters in the three sources. After getti
 We will use **tm package** for cleaning the data. First we will combine all the thress corpuses The combination of all corpuses will require a lot of memory space for calcuation. Therefore, we will create a short sample for the exploratory analysis.
 
 ```{r,  cache= T}
-set.seed(1234)
+set.seed(12345)
 suppressPackageStartupMessages(library(NLP))
 suppressPackageStartupMessages(library(tm)) ## for suppressing message output
 twitter_short <- twitter[sample(length(twitter),replace = F, size = 0.01*length(twitter))]
@@ -116,14 +116,15 @@ The first step in building a predictive model for text is understanding the dist
 suppressPackageStartupMessages(library(RWeka))
 suppressPackageStartupMessages(library(tm))
 suppressPackageStartupMessages(library(ggplot2))
-bigram<-function(x) NGramTokenizer(x,Weka_control(min=1,max=1))
-bigramtab<-TermDocumentMatrix(corpus_combined,control=list(tokenize=bigram))
-bigramcorpus<-findFreqTerms(bigramtab,lowfreq=20)
-bigramcorpusnum<-rowSums(as.matrix(bigramtab[bigramcorpus,]))
-bigramcorpustab<-data.frame(Word=names(bigramcorpusnum),frequency=bigramcorpusnum)
-bigramcorpussort<-bigramcorpustab[order(-bigramcorpustab$frequency),]
 
-ggplot(bigramcorpussort[1:12,],aes(x=reorder(Word,-frequency),y=frequency))+
+unigram<-function(x) NGramTokenizer(x,Weka_control(min=1,max=1))
+unigramtab<-TermDocumentMatrix(corpus_combined,control=list(tokenize=unigram))
+unigramcorpus<-findFreqTerms(unigramtab,lowfreq=20)
+unigramcorpusnum<-rowSums(as.matrix(unigramtab[unigramcorpus,]))
+unigramcorpustab<-data.frame(Word=names(unigramcorpusnum),frequency=unigramcorpusnum)
+unigramcorpussort<-unigramcorpustab[order(-unigramcorpustab$frequency),]
+
+ggplot(unigramcorpussort[1:12,],aes(x=reorder(Word,-frequency),y=frequency))+
   geom_bar(stat="identity",fill = I("grey50"))+
   labs(title="Unigrams",x="Most Words",y="Frequency")+
   theme(axis.text.x=element_text(angle=0))
@@ -132,9 +133,7 @@ ggplot(bigramcorpussort[1:12,],aes(x=reorder(Word,-frequency),y=frequency))+
 #### Frequency of Bi-Grams
 
 ```{r,  cache= T}
-suppressPackageStartupMessages(library(RWeka))
-suppressPackageStartupMessages(library(tm))
-suppressPackageStartupMessages(library(ggplot2))
+
 bigram<-function(x) NGramTokenizer(x,Weka_control(min=2,max=2))
 bigramtab<-TermDocumentMatrix(corpus_combined,control=list(tokenize=bigram))
 bigramcorpus<-findFreqTerms(bigramtab,lowfreq=20)
@@ -151,8 +150,7 @@ ggplot(bigramcorpussort[1:12,],aes(x=reorder(Word,-frequency),y=frequency))+
 
 #### Frequency of Tri-grams
 ```{r, cache= T}
-suppressPackageStartupMessages(library(RWeka))
-suppressPackageStartupMessages(library(tm))
+
 trigram<-function(x) NGramTokenizer(x,Weka_control(min=3,max=3))
 trigramtab<-TermDocumentMatrix(corpus_combined,control=list(tokenize=trigram))
 trigramcorpus<-findFreqTerms(trigramtab,lowfreq=5)
@@ -166,3 +164,8 @@ ggplot(trigramcorpussort[1:10,],aes(x=reorder(Word,-frequency),y=frequency))+
   theme(axis.text.x=element_text(angle=60))
 ```
 
+### Plans for the subsequent stages Project
+- The corpus size is very big for the system to handle in the memory, I have recently added additional 8gb of RAM but still the CPU is taking time because R operations are single threaded. So, I am planning to use *DoSnow* package to parallelize the computation on multiple threads of CPU
+- RWeka seemed to be  a great package for doing text mining but another package tokenizer package is also interesting and I am exploring to use it in the subsequent steps.
+- The strategy is to use as much as possible part of the corpus so that the results are fine tuned.
+- Dployment as a shiny web app is the next part of the subsequent stage
