@@ -1,0 +1,168 @@
+---
+title: "Coursera Data Science Capstone Milestone Report"
+author: "Rajat Kumar"
+date: "November 30, 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is a milestone report for the **Data Science Specialization Course**.The focus of the project is inclined towards the **Data Mining in R** .It contains three essential parts, which are as follows:
+
+- Getting and Cleaning Data
+- Exploratory Analysis of Data
+- Plans for the subsequent stages Project
+
+We will start with **Getting And Cleaning Data**.
+
+### Getting And Cleaning Data
+The course provides a collection of text scrapped from various sources like blogs, news and twitter.You can download the file from this [link](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip). We will call this collection of text as the *corpus*. For the purpose of this project we will focus on the **English Language** corpus only.
+
+#### Getting the data
+```{r,cache=TRUE}
+## creating a directory
+if(!dir.exists("./Last_Module")){
+  dir.create("./Last_Module")
+}
+
+##Downloading the file
+link <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+download.file(url = link, destfile = "./Last_Module/data",method = "curl")
+
+##Unzipping the file
+unzip(zipfile ="./Last_Module/data", exdir = "./Last_Module/corpus")
+```
+
+Now, the Data has been downloaded. We will take a look at the files and type of data, which is available with us. This step will be followed by cleaning the dataset.
+
+#### Reading the data into r
+```{r, cache= T, echo=F}
+suppressPackageStartupMessages(library(tm))
+```
+
+```{r, cache=T, warning=FALSE, comment= NA}
+con1 <- file("./Last_Module/corpus/final/en_US/en_US.blogs.txt", "r")
+blogs <-readLines(con1,skipNul = TRUE)
+close(con1)
+con2 <- file("./Last_Module/corpus/final/en_US/en_US.news.txt", "r")
+news <- readLines(con2,skipNul = TRUE)
+close(con2)
+con3 <-file("./Last_Module/corpus/final/en_US/en_US.twitter.txt","r")
+twitter <-readLines(con3,skipNul = TRUE)
+close(con3)
+data1 <- list(blogs, news, twitter)
+char <- sapply(X = data1, FUN = nchar)
+Summary <- sapply(char, summary)
+colnames(Summary) <- c("Blogs", "News", "Twitter")
+Summary
+```
+
+The above output gives the number of charcters in the three sources. After getting some information about the data, we need to clean the data. Data cleaning methods are of various types in text mining, which are as follows:
+
+
+- Converting the entire document to lower case
+- Removing punctuation marks (periods, commas, hyphens etc)
+- Removing stopwords (extremely common words such as "and", "or", "not", "in", "is" etc)
+- Removing numbers
+- Filtering out unwanted terms
+- Removing extra whitespace
+
+### Data Cleaning
+
+We will use **tm package** for cleaning the data. First we will combine all the thress corpuses The combination of all corpuses will require a lot of memory space for calcuation. Therefore, we will create a short sample for the exploratory analysis.
+
+```{r,  cache= T}
+set.seed(1234)
+suppressPackageStartupMessages(library(NLP))
+suppressPackageStartupMessages(library(tm)) ## for suppressing message output
+twitter_short <- twitter[sample(length(twitter),replace = F, size = 0.01*length(twitter))]
+blogs_short <- blogs[sample(length(blogs),replace = F, size = 0.001*length(blogs))]
+news_short <- news[sample(length(news),replace = F, size = 0.01*length(news))]
+corpus_combined <- c(blogs_short, news_short, twitter_short)
+corpus_combined <- iconv(corpus_combined,
+                         "latin1","ASCII",sub="") ### Removing the other language or symbols
+corpus_combined <- VectorSource(corpus_combined)
+corpus_combined <- VCorpus(corpus_combined)
+```
+
+After combining all the corpuses we will do data cleaning or data preprocessing
+
+```{r,  cache= T,warning= FALSE, comment= NA}
+suppressPackageStartupMessages(library(dplyr))
+corpus_combined<- corpus_combined %>% tm_map(tolower) %>% tm_map(removePunctuation) %>% 
+                    tm_map(removeWords,stopwords(kind="en")) %>%  
+                      tm_map(removeNumbers)%>%tm_map(stripWhitespace) %>% tm_map(PlainTextDocument)
+for (i in 1:3) print (corpus_combined[[i]]$content)
+```
+
+We can see that most of the frequently used articles,punctuations,numbers and additional whitespaces has been removed by the above operations. Additionally, all the words have been reduced to lower case. After cleaning the data, we will move to the exploratory analysis of the data.
+
+### Exploratory Analysis of the data
+
+The first step in building a predictive model for text is understanding the distribution and relationship between the words, tokens, and phrases in the text. The goal of this part is to understand the basic relationships observed in the data and prepare to build the first linguistic models.
+
+1. **Exploratory analysis** - perform a thorough exploratory analysis of the data, understanding the distribution of words and relationship between the words in the corpora.
+    
+2. **Understand frequencies of words and word pairs** - build figures and tables to understand variation in the frequencies of words and word pairs in the data.
+
+
+#### Frequency of Uni-Grams
+
+```{r,  cache= T}
+suppressPackageStartupMessages(library(RWeka))
+suppressPackageStartupMessages(library(tm))
+suppressPackageStartupMessages(library(ggplot2))
+bigram<-function(x) NGramTokenizer(x,Weka_control(min=1,max=1))
+bigramtab<-TermDocumentMatrix(corpus_combined,control=list(tokenize=bigram))
+bigramcorpus<-findFreqTerms(bigramtab,lowfreq=20)
+bigramcorpusnum<-rowSums(as.matrix(bigramtab[bigramcorpus,]))
+bigramcorpustab<-data.frame(Word=names(bigramcorpusnum),frequency=bigramcorpusnum)
+bigramcorpussort<-bigramcorpustab[order(-bigramcorpustab$frequency),]
+
+ggplot(bigramcorpussort[1:12,],aes(x=reorder(Word,-frequency),y=frequency))+
+  geom_bar(stat="identity",fill = I("grey50"))+
+  labs(title="Unigrams",x="Most Words",y="Frequency")+
+  theme(axis.text.x=element_text(angle=0))
+```
+
+#### Frequency of Bi-Grams
+
+```{r,  cache= T}
+suppressPackageStartupMessages(library(RWeka))
+suppressPackageStartupMessages(library(tm))
+suppressPackageStartupMessages(library(ggplot2))
+bigram<-function(x) NGramTokenizer(x,Weka_control(min=2,max=2))
+bigramtab<-TermDocumentMatrix(corpus_combined,control=list(tokenize=bigram))
+bigramcorpus<-findFreqTerms(bigramtab,lowfreq=20)
+bigramcorpusnum<-rowSums(as.matrix(bigramtab[bigramcorpus,]))
+bigramcorpustab<-data.frame(Word=names(bigramcorpusnum),frequency=bigramcorpusnum)
+bigramcorpussort<-bigramcorpustab[order(-bigramcorpustab$frequency),]
+
+ggplot(bigramcorpussort[1:12,],aes(x=reorder(Word,-frequency),y=frequency))+
+  geom_bar(stat="identity",fill = I("grey50"))+
+  labs(title="Bigrams",x="Most Words",y="Frequency")+
+  theme(axis.text.x=element_text(angle=60))
+```
+
+
+#### Frequency of Tri-grams
+```{r, cache= T}
+suppressPackageStartupMessages(library(RWeka))
+suppressPackageStartupMessages(library(tm))
+trigram<-function(x) NGramTokenizer(x,Weka_control(min=3,max=3))
+trigramtab<-TermDocumentMatrix(corpus_combined,control=list(tokenize=trigram))
+trigramcorpus<-findFreqTerms(trigramtab,lowfreq=5)
+trigramcorpusnum<-rowSums(as.matrix(trigramtab[trigramcorpus,]))
+trigramcorpustab<-data.frame(Word=names(trigramcorpusnum),frequency=trigramcorpusnum)
+trigramcorpussort<-trigramcorpustab[order(-trigramcorpustab$frequency),]
+
+ggplot(trigramcorpussort[1:10,],aes(x=reorder(Word,-frequency),y=frequency))+
+  geom_bar(stat="identity",fill = I("grey50"))+
+  labs(title="Trigrams",x="Most Words",y="Frequency")+
+  theme(axis.text.x=element_text(angle=60))
+```
+
